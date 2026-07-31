@@ -15,7 +15,7 @@ def convert_to_csv_url(url):
 
 # --- STEP 2: PASTE YOUR GOOGLE SHEET LINKS HERE ---
 # Replace these placeholder URLs with your actual Google Sheet share links!
-SHEET_1_URL = "https://docs.google.com/spreadsheets/d/1YOUR_FIRST_SHEET_ID_HERE/edit?usp=sharing"
+SHEET_1_URL = https://docs.google.com/spreadsheets/d/1-J20gbbFJ0QOjMNxE1XMp3m3CKV4AZjlAWvypwq5X00/edit?usp=sharing
 SHEET_2_URL = "https://docs.google.com/spreadsheets/d/1YOUR_SECOND_SHEET_ID_HERE/edit?usp=sharing"
 
 # --- STEP 3: LOAD THE LIVE DATA ---
