@@ -5,11 +5,12 @@ from streamlit_autorefresh import st_autorefresh
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(page_title="Live Sheet Dashboard", layout="wide")
-st.title("📊 Live Testing Dashboard")
+st.title("📊 Live Interactive Dashboard")
 st.markdown("This dashboard pulls live data from your Google Sheet and plots parameters dynamically.")
 
-# --- STEP 0: AUTOMATIC REFRESH (EVERY 30 SECONDS) ---
-count = st_autorefresh(interval=30000, limit=None, key="sheet_autorefresh")
+# --- STEP 0: AUTOMATIC REFRESH (EVERY 30 SECONDS - BACKGROUND) ---
+# Running quietly without displaying the raw count value
+st_autorefresh(interval=30000, limit=None, key="sheet_autorefresh")
 
 # --- STEP 1: CONVERT GOOGLE SHEET LINK TO CSV EXPORT LINK ---
 def convert_to_csv_url(url):
@@ -42,13 +43,15 @@ def load_live_data(url1):
 try:
     combined_df = load_live_data(SHEET_1_URL)
     
-    # Display preview expander so you can verify the data columns
+    # Display preview expander
     with st.expander("👀 View Raw Data Preview"):
         st.dataframe(combined_df.head())
 
     # --- STEP 4: DASHBOARD CONTROLS ---
     st.sidebar.header("🛠️ Dashboard Controls")
-    st.sidebar.info(f"🔄 Auto-refreshing every 30 seconds. (Refreshes: {count})")
+    
+    # Clean static auto-refresh message without displaying count
+    st.sidebar.info("🔄 Auto-refreshes every 30 seconds")
     
     index_key = st.sidebar.selectbox("Select baseline column (X-Axis):", combined_df.columns)
     
@@ -68,18 +71,56 @@ try:
         combined_df['ROI_Ratio'] = combined_df['Sales'] / combined_df['Ad_Spend']
     # ─────────────────────────────────────────────────────────────────
 
-    # --- STEP 5: PARAMETER SELECTION ---
+    # --- STEP 5: URL PARAMETERS & PERSISTENT DEFAULTS ---
     available_metrics = [col for col in combined_df.columns if col != index_key]
     
-    selected_metrics = st.sidebar.multiselect(
-        "Select parameters to display on the graph:",
+    # Read choices passed through shared link (URL query parameters)
+    query_params = st.query_params
+    
+    default_kpis = query_params.get("kpis", "").split(",") if query_params.get("kpis") else [available_metrics[0]] if available_metrics else []
+    default_metrics = query_params.get("metrics", "").split(",") if query_params.get("metrics") else [available_metrics[0]] if available_metrics else []
+
+    # Clean default filters against available columns
+    valid_default_kpis = [m for m in default_kpis if m in available_metrics]
+    valid_default_metrics = [m for m in default_metrics if m in available_metrics]
+
+    # --- SIDEBAR CONTROL SELECTIONS ---
+    selected_kpis = st.sidebar.multiselect(
+        "📌 Select KPI Scorecards (Top Cards):",
         options=available_metrics,
-        default=[available_metrics[0]] if available_metrics else None
+        default=valid_default_kpis if valid_default_kpis else ([available_metrics[0]] if available_metrics else None)
+    )
+
+    selected_metrics = st.sidebar.multiselect(
+        "📈 Select Graph Parameters:",
+        options=available_metrics,
+        default=valid_default_metrics if valid_default_metrics else ([available_metrics[0]] if available_metrics else None)
     )
     
     chart_type = st.sidebar.radio("Select Chart Style:", ["Line Chart", "Bar Chart"])
 
-    # --- STEP 6: RENDER THE GRAPH ---
+    # Update URL query parameters so copying/sharing the link retains current selections
+    st.query_params["kpis"] = ",".join(selected_kpis)
+    st.query_params["metrics"] = ",".join(selected_metrics)
+
+    # --- STEP 6: RENDER KPI SCORECARDS ---
+    if selected_kpis:
+        st.subheader("📌 Key Performance Indicators (KPIs)")
+        kpi_cols = st.columns(len(selected_kpis))
+        
+        for idx, kpi in enumerate(selected_kpis):
+            latest_val = combined_df[kpi].iloc[-1] if not combined_df[kpi].empty else 0
+            avg_val = combined_df[kpi].mean()
+            
+            # Format numbers cleanly
+            val_str = f"{latest_val:,.2f}" if isinstance(latest_val, (int, float)) else str(latest_val)
+            avg_str = f"Avg: {avg_val:,.2f}" if isinstance(avg_val, (int, float)) else ""
+            
+            with kpi_cols[idx]:
+                st.metric(label=kpi, value=val_str, delta=avg_str)
+        st.markdown("---")
+
+    # --- STEP 7: RENDER THE GRAPH ---
     if selected_metrics:
         st.subheader(f"📈 Analysis (Plotting against {index_key})")
         
@@ -90,7 +131,6 @@ try:
             fig = px.bar(combined_df, x=index_key, y=selected_metrics, barmode="group",
                          title=f"Comparison over {index_key}")
             
-        # Updated Legend Styling: Clear, readable dark background overlay
         fig.update_layout(
             hovermode="x unified",
             margin=dict(l=20, r=20, t=50, b=20),
@@ -101,8 +141,8 @@ try:
                 y=1.02,
                 xanchor="right",
                 x=1,
-                bgcolor="rgba(15, 23, 42, 0.85)",   # Modern slate-dark background
-                font=dict(color="white"),           # Crisp white text for contrast
+                bgcolor="rgba(15, 23, 42, 0.85)",
+                font=dict(color="white"),
                 bordercolor="rgba(255, 255, 255, 0.2)",
                 borderwidth=1
             )
