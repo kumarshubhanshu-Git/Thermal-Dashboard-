@@ -47,6 +47,7 @@ try:
     
     # ─────────────────────────────────────────────────────────────────
     # 🧪 CUSTOM CALCULATIONS ZONE
+    # Add, change, or remove formulas below to match your sheet columns.
     # ─────────────────────────────────────────────────────────────────
     if 'Channel_A' in combined_df.columns and 'Channel_B' in combined_df.columns:
         combined_df['Avg_Channel_A_and_B'] = combined_df[['Channel_A', 'Channel_B']].mean(axis=1)
@@ -81,10 +82,19 @@ try:
             fig = px.bar(combined_df, x=index_key, y=selected_metrics, barmode="group",
                          title=f"Comparison over {index_key}")
             
+        # Update layout to move legend onto/above the chart area
         fig.update_layout(
             hovermode="x unified",
-            legend_title_text="Parameters",
-            margin=dict(l=20, r=20, t=40, b=20)
+            margin=dict(l=20, r=20, t=50, b=20),
+            legend=dict(
+                title_text="",
+                orientation="h",                  # Horizontal layout saves screen width
+                yanchor="bottom",
+                y=1.02,                           # Positioned directly above graph canvas
+                xanchor="right",
+                x=1,
+                bgcolor="rgba(255, 255, 255, 0.6)"# Semi-transparent background
+            )
         )
         
         st.plotly_chart(fig, use_container_width=True)
