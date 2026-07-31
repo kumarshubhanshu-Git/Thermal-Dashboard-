@@ -4,7 +4,7 @@ import plotly.express as px
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(page_title="Live Sheet Dashboard", layout="wide")
-st.title("📊 Live Interactive Dashboard")
+st.title("📊 Live Testing Dashboard")
 st.markdown("This dashboard pulls live data from your Google Sheet and plots parameters dynamically.")
 
 # --- STEP 1: CONVERT GOOGLE SHEET LINK TO CSV EXPORT LINK ---
