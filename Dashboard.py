@@ -9,7 +9,6 @@ st.title("📊 Live Interactive Dashboard")
 st.markdown("This dashboard pulls live data from your Google Sheet and plots parameters dynamically.")
 
 # --- STEP 0: AUTOMATIC REFRESH (EVERY 30 SECONDS - BACKGROUND) ---
-# Running quietly without displaying the raw count value
 st_autorefresh(interval=30000, limit=None, key="sheet_autorefresh")
 
 # --- STEP 1: CONVERT GOOGLE SHEET LINK TO CSV EXPORT LINK ---
@@ -49,8 +48,6 @@ try:
 
     # --- STEP 4: DASHBOARD CONTROLS ---
     st.sidebar.header("🛠️ Dashboard Controls")
-    
-    # Clean static auto-refresh message without displaying count
     st.sidebar.info("🔄 Auto-refreshes every 30 seconds")
     
     index_key = st.sidebar.selectbox("Select baseline column (X-Axis):", combined_df.columns)
@@ -71,37 +68,49 @@ try:
         combined_df['ROI_Ratio'] = combined_df['Sales'] / combined_df['Ad_Spend']
     # ─────────────────────────────────────────────────────────────────
 
-    # --- STEP 5: URL PARAMETERS & PERSISTENT DEFAULTS ---
+    # --- STEP 5: URL PARAMETERS & MULTI-SELECT SYNC FIX ---
     available_metrics = [col for col in combined_df.columns if col != index_key]
     
-    # Read choices passed through shared link (URL query parameters)
-    query_params = st.query_params
+    # Extract query params safely as lists
+    params = st.query_params
     
-    default_kpis = query_params.get("kpis", "").split(",") if query_params.get("kpis") else [available_metrics[0]] if available_metrics else []
-    default_metrics = query_params.get("metrics", "").split(",") if query_params.get("metrics") else [available_metrics[0]] if available_metrics else []
+    url_kpis = params.get_all("kpis") if "kpis" in params else []
+    url_metrics = params.get_all("metrics") if "metrics" in params else []
 
-    # Clean default filters against available columns
-    valid_default_kpis = [m for m in default_kpis if m in available_metrics]
-    valid_default_metrics = [m for m in default_metrics if m in available_metrics]
+    # If parameters were saved as comma-separated values in URL, split them correctly
+    if url_kpis and len(url_kpis) == 1 and "," in url_kpis[0]:
+        url_kpis = url_kpis[0].split(",")
+    if url_metrics and len(url_metrics) == 1 and "," in url_metrics[0]:
+        url_metrics = url_metrics[0].split(",")
 
-    # --- SIDEBAR CONTROL SELECTIONS ---
+    # Validate choices against actual available columns
+    valid_kpis = [k for k in url_kpis if k in available_metrics]
+    valid_metrics = [m for m in url_metrics if m in available_metrics]
+
+    # Set default fallbacks if URL has no valid parameters yet
+    if not valid_kpis and available_metrics:
+        valid_kpis = [available_metrics[0]]
+    if not valid_metrics and available_metrics:
+        valid_metrics = [available_metrics[0]]
+
+    # --- SIDEBAR CONTROLS ---
     selected_kpis = st.sidebar.multiselect(
         "📌 Select KPI Scorecards (Top Cards):",
         options=available_metrics,
-        default=valid_default_kpis if valid_default_kpis else ([available_metrics[0]] if available_metrics else None)
+        default=valid_kpis
     )
 
     selected_metrics = st.sidebar.multiselect(
         "📈 Select Graph Parameters:",
         options=available_metrics,
-        default=valid_default_metrics if valid_default_metrics else ([available_metrics[0]] if available_metrics else None)
+        default=valid_metrics
     )
     
     chart_type = st.sidebar.radio("Select Chart Style:", ["Line Chart", "Bar Chart"])
 
-    # Update URL query parameters so copying/sharing the link retains current selections
-    st.query_params["kpis"] = ",".join(selected_kpis)
-    st.query_params["metrics"] = ",".join(selected_metrics)
+    # Sync back to URL parameters dynamically
+    st.query_params["kpis"] = selected_kpis
+    st.query_params["metrics"] = selected_metrics
 
     # --- STEP 6: RENDER KPI SCORECARDS ---
     if selected_kpis:
@@ -112,7 +121,6 @@ try:
             latest_val = combined_df[kpi].iloc[-1] if not combined_df[kpi].empty else 0
             avg_val = combined_df[kpi].mean()
             
-            # Format numbers cleanly
             val_str = f"{latest_val:,.2f}" if isinstance(latest_val, (int, float)) else str(latest_val)
             avg_str = f"Avg: {avg_val:,.2f}" if isinstance(avg_val, (int, float)) else ""
             
