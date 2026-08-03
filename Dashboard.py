@@ -8,7 +8,7 @@ st.set_page_config(page_title="Live Sheet Dashboard", layout="wide")
 st.title("📊 Live Interactive Dashboard")
 st.markdown("This dashboard pulls live data from your Google Sheet and plots parameters dynamically.")
 
-# --- STEP 0: AUTOMATIC REFRESH (EVERY 30 SECONDS - BACKGROUND) ---
+# --- STEP 0: AUTOMATIC REFRESH (EVERY 30 SECONDS - QUIET BACKGROUND) ---
 st_autorefresh(interval=30000, limit=None, key="sheet_autorefresh")
 
 # --- STEP 1: CONVERT GOOGLE SHEET LINK TO CSV EXPORT LINK ---
@@ -52,7 +52,7 @@ try:
     
     index_key = st.sidebar.selectbox("Select baseline column (X-Axis):", combined_df.columns)
     
-    # Sort dataframe by the selected x-axis to keep line plots smooth
+    # Sort dataframe by selected x-axis to keep line plots smooth
     combined_df = combined_df.sort_values(by=index_key)
 
     # ─────────────────────────────────────────────────────────────────
@@ -68,32 +68,22 @@ try:
         combined_df['ROI_Ratio'] = combined_df['Sales'] / combined_df['Ad_Spend']
     # ─────────────────────────────────────────────────────────────────
 
-    # --- STEP 5: URL PARAMETERS & MULTI-SELECT SYNC FIX ---
+    # --- STEP 5: FIXED DEFAULT KPIS & GRAPH PARAMETERS ---
     available_metrics = [col for col in combined_df.columns if col != index_key]
     
-    # Extract query params safely as lists
-    params = st.query_params
-    
-    url_kpis = params.get_all("kpis") if "kpis" in params else []
-    url_metrics = params.get_all("metrics") if "metrics" in params else []
+    # ✏️ EDIT THESE 2 LISTS with the exact column names from your sheet!
+    MY_DEFAULT_KPIS = ["Channel_A", "Channel_B", "Sales"]       
+    MY_DEFAULT_GRAPH = ["Channel_A", "Channel_B"]              
 
-    # If parameters were saved as comma-separated values in URL, split them correctly
-    if url_kpis and len(url_kpis) == 1 and "," in url_kpis[0]:
-        url_kpis = url_kpis[0].split(",")
-    if url_metrics and len(url_metrics) == 1 and "," in url_metrics[0]:
-        url_metrics = url_metrics[0].split(",")
+    valid_kpis = [k for k in MY_DEFAULT_KPIS if k in available_metrics]
+    valid_graph = [m for m in MY_DEFAULT_GRAPH if m in available_metrics]
 
-    # Validate choices against actual available columns
-    valid_kpis = [k for k in url_kpis if k in available_metrics]
-    valid_metrics = [m for m in url_metrics if m in available_metrics]
-
-    # Set default fallbacks if URL has no valid parameters yet
     if not valid_kpis and available_metrics:
-        valid_kpis = [available_metrics[0]]
-    if not valid_metrics and available_metrics:
-        valid_metrics = [available_metrics[0]]
+        valid_kpis = available_metrics[:3]  
+    if not valid_graph and available_metrics:
+        valid_graph = [available_metrics[0]]
 
-    # --- SIDEBAR CONTROLS ---
+    # --- SIDEBAR DROPDOWNS ---
     selected_kpis = st.sidebar.multiselect(
         "📌 Select KPI Scorecards (Top Cards):",
         options=available_metrics,
@@ -103,61 +93,57 @@ try:
     selected_metrics = st.sidebar.multiselect(
         "📈 Select Graph Parameters:",
         options=available_metrics,
-        default=valid_metrics
+        default=valid_graph
     )
     
     chart_type = st.sidebar.radio("Select Chart Style:", ["Line Chart", "Bar Chart"])
 
-    # Sync back to URL parameters dynamically
-    st.query_params["kpis"] = selected_kpis
-    st.query_params["metrics"] = selected_metrics
-
-    # --- STEP 6: RENDER KPI SCORECARDS ---
+    # --- STEP 6: RENDER KPI SCORECARDS (WITH BACKGROUND & BORDER) ---
     if selected_kpis:
         st.subheader("📌 Key Performance Indicators (KPIs)")
         kpi_cols = st.columns(len(selected_kpis))
         
         for idx, kpi in enumerate(selected_kpis):
             latest_val = combined_df[kpi].iloc[-1] if not combined_df[kpi].empty else 0
-            avg_val = combined_df[kpi].mean()
-            
             val_str = f"{latest_val:,.2f}" if isinstance(latest_val, (int, float)) else str(latest_val)
-            avg_str = f"Avg: {avg_val:,.2f}" if isinstance(avg_val, (int, float)) else ""
             
             with kpi_cols[idx]:
-                st.metric(label=kpi, value=val_str, delta=avg_str)
-        st.markdown("---")
+                # Streamlit container with border and custom background for each KPI card
+                with st.container(border=True):
+                    st.metric(label=kpi, value=val_str)
+        st.markdown("<br>", unsafe_allow_html=True)
 
-    # --- STEP 7: RENDER THE GRAPH ---
+    # --- STEP 7: RENDER THE GRAPH (INSIDE A BORDER CONTAINER) ---
     if selected_metrics:
-        st.subheader(f"📈 Analysis (Plotting against {index_key})")
-        
-        if chart_type == "Line Chart":
-            fig = px.line(combined_df, x=index_key, y=selected_metrics, markers=True,
-                          title=f"Trends over {index_key}")
-        else:
-            fig = px.bar(combined_df, x=index_key, y=selected_metrics, barmode="group",
-                         title=f"Comparison over {index_key}")
+        with st.container(border=True):
+            st.subheader(f"📈 Analysis (Plotting against {index_key})")
             
-        fig.update_layout(
-            hovermode="x unified",
-            margin=dict(l=20, r=20, t=50, b=20),
-            legend=dict(
-                title_text="",
-                orientation="h",
-                yanchor="bottom",
-                y=1.02,
-                xanchor="right",
-                x=1,
-                bgcolor="rgba(15, 23, 42, 0.85)",
-                font=dict(color="white"),
-                bordercolor="rgba(255, 255, 255, 0.2)",
-                borderwidth=1
+            if chart_type == "Line Chart":
+                fig = px.line(combined_df, x=index_key, y=selected_metrics, markers=True,
+                              title=f"Trends over {index_key}")
+            else:
+                fig = px.bar(combined_df, x=index_key, y=selected_metrics, barmode="group",
+                             title=f"Comparison over {index_key}")
+                
+            fig.update_layout(
+                hovermode="x unified",
+                margin=dict(l=20, r=20, t=50, b=20),
+                legend=dict(
+                    title_text="",
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="right",
+                    x=1,
+                    bgcolor="rgba(15, 23, 42, 0.85)",
+                    font=dict(color="white"),
+                    bordercolor="rgba(255, 255, 255, 0.2)",
+                    borderwidth=1
+                )
             )
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
     else:
         st.warning("⚠️ Please select at least one parameter from the sidebar controls to display the chart.")
 
