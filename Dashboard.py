@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from streamlit_autorefresh import st_autorefresh
 
 # --- PAGE CONFIGURATION ---
@@ -26,10 +27,10 @@ def load_live_data(url1):
     csv_url1 = convert_to_csv_url(url1)
     df1 = pd.read_csv(csv_url1)
     
-    # 1. Clean extra spaces from column headers
+    # Clean extra spaces from column headers
     df1.columns = df1.columns.str.strip()
     
-    # 2. Convert all metric columns to numbers (handling commas/symbols)
+    # Convert metric columns to numbers (handling commas/symbols)
     for col in df1.columns:
         try:
             cleaned_col = df1[col].astype(str).str.replace(r'[\$,]', '', regex=True)
@@ -68,37 +69,48 @@ try:
         combined_df['ROI_Ratio'] = combined_df['Sales'] / combined_df['Ad_Spend']
     # ─────────────────────────────────────────────────────────────────
 
-    # --- STEP 5: FIXED DEFAULT KPIS & GRAPH PARAMETERS ---
+    # --- STEP 5: KPIS & DUAL-AXIS SELECTION ---
     available_metrics = [col for col in combined_df.columns if col != index_key]
     
-    # ✏️ EDIT THESE 2 LISTS with the exact column names from your sheet!
+    # Defaults configuration
     MY_DEFAULT_KPIS = ["Channel_A", "Channel_B", "Sales"]       
-    MY_DEFAULT_GRAPH = ["Channel_A", "Channel_B"]              
+    MY_DEFAULT_PRIMARY = ["Channel_A"]              
+    MY_DEFAULT_SECONDARY = ["Channel_B"]
 
     valid_kpis = [k for k in MY_DEFAULT_KPIS if k in available_metrics]
-    valid_graph = [m for m in MY_DEFAULT_GRAPH if m in available_metrics]
+    valid_primary = [m for m in MY_DEFAULT_PRIMARY if m in available_metrics]
+    valid_secondary = [m for m in MY_DEFAULT_SECONDARY if m in available_metrics]
 
     if not valid_kpis and available_metrics:
-        valid_kpis = available_metrics[:3]  
-    if not valid_graph and available_metrics:
-        valid_graph = [available_metrics[0]]
+        valid_kpis = available_metrics[:3]
+    if not valid_primary and available_metrics:
+        valid_primary = [available_metrics[0]]
 
-    # --- SIDEBAR DROPDOWNS ---
+    # Sidebar controls for KPIs and Axis Mapping
     selected_kpis = st.sidebar.multiselect(
         "📌 Select KPI Scorecards (Top Cards):",
         options=available_metrics,
         default=valid_kpis
     )
 
-    selected_metrics = st.sidebar.multiselect(
-        "📈 Select Graph Parameters:",
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📈 Multi-Axis Graph Settings")
+    
+    primary_metrics = st.sidebar.multiselect(
+        "Select Primary Axis Parameters (Left Y-Axis):",
         options=available_metrics,
-        default=valid_graph
+        default=valid_primary
+    )
+    
+    secondary_metrics = st.sidebar.multiselect(
+        "Select Secondary Axis Parameters (Right Y-Axis):",
+        options=available_metrics,
+        default=valid_secondary
     )
     
     chart_type = st.sidebar.radio("Select Chart Style:", ["Line Chart", "Bar Chart"])
 
-    # --- STEP 6: RENDER KPI SCORECARDS (WITH BACKGROUND & BORDER) ---
+    # --- STEP 6: RENDER KPI SCORECARDS ---
     if selected_kpis:
         st.subheader("📌 Key Performance Indicators (KPIs)")
         kpi_cols = st.columns(len(selected_kpis))
@@ -108,26 +120,54 @@ try:
             val_str = f"{latest_val:,.2f}" if isinstance(latest_val, (int, float)) else str(latest_val)
             
             with kpi_cols[idx]:
-                # Streamlit container with border and custom background for each KPI card
                 with st.container(border=True):
                     st.metric(label=kpi, value=val_str)
         st.markdown("<br>", unsafe_allow_html=True)
 
-    # --- STEP 7: RENDER THE GRAPH (INSIDE A BORDER CONTAINER) ---
-    if selected_metrics:
+    # --- STEP 7: RENDER MULTI-AXIS GRAPH ---
+    if primary_metrics or secondary_metrics:
         with st.container(border=True):
             st.subheader(f"📈 Analysis (Plotting against {index_key})")
             
-            if chart_type == "Line Chart":
-                fig = px.line(combined_df, x=index_key, y=selected_metrics, markers=True,
-                              title=f"Trends over {index_key}")
-            else:
-                fig = px.bar(combined_df, x=index_key, y=selected_metrics, barmode="group",
-                             title=f"Comparison over {index_key}")
-                
+            # Create Subplot with Secondary Y-Axis enabled
+            fig = make_subplots(specs=[[{"secondary_y": True}]])
+            
+            # Add Primary (Left Y-Axis) Traces
+            for metric in primary_metrics:
+                if chart_type == "Line Chart":
+                    fig.add_trace(
+                        go.Scatter(x=combined_df[index_key], y=combined_df[metric], name=f"{metric} (Left)", mode='lines+markers'),
+                        secondary_y=False
+                    )
+                else:
+                    fig.add_trace(
+                        go.Bar(x=combined_df[index_key], y=combined_df[metric], name=f"{metric} (Left)"),
+                        secondary_y=False
+                    )
+                    
+            # Add Secondary (Right Y-Axis) Traces
+            for metric in secondary_metrics:
+                if chart_type == "Line Chart":
+                    fig.add_trace(
+                        go.Scatter(x=combined_df[index_key], y=combined_df[metric], name=f"{metric} (Right)", mode='lines+markers'),
+                        secondary_y=True
+                    )
+                else:
+                    fig.add_trace(
+                        go.Bar(x=combined_df[index_key], y=combined_df[metric], name=f"{metric} (Right)"),
+                        secondary_y=True
+                    )
+
+            # Set Axis Titles
+            fig.update_xaxes(title_text=index_key)
+            fig.update_yaxes(title_text=", ".join(primary_metrics) if primary_metrics else "Primary Axis", secondary_y=False)
+            fig.update_yaxes(title_text=", ".join(secondary_metrics) if secondary_metrics else "Secondary Axis", secondary_y=True)
+
+            # Custom Layout Aesthetics
             fig.update_layout(
                 hovermode="x unified",
                 margin=dict(l=20, r=20, t=50, b=20),
+                barmode="group" if chart_type == "Bar Chart" else None,
                 legend=dict(
                     title_text="",
                     orientation="h",
@@ -145,7 +185,7 @@ try:
             st.plotly_chart(fig, use_container_width=True)
             
     else:
-        st.warning("⚠️ Please select at least one parameter from the sidebar controls to display the chart.")
+        st.warning("⚠️ Please select at least one parameter for either the Primary or Secondary axis to display the chart.")
 
 except Exception as e:
     st.error(f"❌ Failed to load live data. Error details: {e}")
