@@ -19,7 +19,7 @@ def convert_to_csv_url(url):
     return url
 
 # --- STEP 2: PASTE YOUR GOOGLE SHEET LINK HERE ---
-SHEET_1_URL = "https://docs.google.com/spreadsheets/d/1-J20gbbFJ0QOjMNxE1XMp3m3CKV4AZjlAWvypwq5X00/edit?usp=sharing"
+SHEET_1_URL = "https://docs.google.com/spreadsheets/d/1m_8Uw2d37L7yYwKgrJ8lSQagkf6LEdmUWJdqOkAz0A4/edit?usp=sharing"
 
 # --- STEP 3: LOAD AND CLEAN LIVE DATA ---
 @st.cache_data(ttl=0)
