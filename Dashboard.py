@@ -56,41 +56,14 @@ try:
     # Sort dataframe by selected x-axis to keep line plots smooth
     combined_df = combined_df.sort_values(by=index_key)
 
-    # ─────────────────────────────────────────────────────────────────
-    # 🧪 CUSTOM CALCULATIONS ZONE
-    # ─────────────────────────────────────────────────────────────────
-    if 'Channel_A' in combined_df.columns and 'Channel_B' in combined_df.columns:
-        combined_df['Avg_Channel_A_and_B'] = combined_df[['Channel_A', 'Channel_B']].mean(axis=1)
-        
-    if 'Facebook' in combined_df.columns and 'Instagram' in combined_df.columns:
-        combined_df['Total_Social_Traffic'] = combined_df['Facebook'] + combined_df['Instagram']
-        
-    if 'Sales' in combined_df.columns and 'Ad_Spend' in combined_df.columns:
-        combined_df['ROI_Ratio'] = combined_df['Sales'] / combined_df['Ad_Spend']
-    # ─────────────────────────────────────────────────────────────────
-
     # --- STEP 5: KPIS & DUAL-AXIS SELECTION ---
     available_metrics = [col for col in combined_df.columns if col != index_key]
-    
-    # Defaults configuration
-    MY_DEFAULT_KPIS = ["Channel_A", "Channel_B", "Sales"]       
-    MY_DEFAULT_PRIMARY = ["Channel_A"]              
-    MY_DEFAULT_SECONDARY = ["Channel_B"]
-
-    valid_kpis = [k for k in MY_DEFAULT_KPIS if k in available_metrics]
-    valid_primary = [m for m in MY_DEFAULT_PRIMARY if m in available_metrics]
-    valid_secondary = [m for m in MY_DEFAULT_SECONDARY if m in available_metrics]
-
-    if not valid_kpis and available_metrics:
-        valid_kpis = available_metrics[:3]
-    if not valid_primary and available_metrics:
-        valid_primary = [available_metrics[0]]
 
     # Sidebar controls for KPIs and Axis Mapping
     selected_kpis = st.sidebar.multiselect(
         "📌 Select KPI Scorecards (Top Cards):",
         options=available_metrics,
-        default=valid_kpis
+        default=[]
     )
 
     st.sidebar.markdown("---")
@@ -99,13 +72,13 @@ try:
     primary_metrics = st.sidebar.multiselect(
         "Select Primary Axis Parameters (Left Y-Axis):",
         options=available_metrics,
-        default=valid_primary
+        default=[]
     )
     
     secondary_metrics = st.sidebar.multiselect(
         "Select Secondary Axis Parameters (Right Y-Axis):",
         options=available_metrics,
-        default=valid_secondary
+        default=[]
     )
     
     chart_type = st.sidebar.radio("Select Chart Style:", ["Line Chart", "Bar Chart"])
