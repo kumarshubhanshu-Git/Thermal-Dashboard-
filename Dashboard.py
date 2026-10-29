@@ -6,7 +6,7 @@ from streamlit_autorefresh import st_autorefresh
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(page_title="Live Sheet Dashboard", layout="wide")
-st.title("📊250MJ -10MT -Discharging Test ")
+st.title("📊250MJ -10MT -Autonomy(Backup Test) ")
 st.markdown("This dashboard pulls live data from your Google Sheet and plots parameters dynamically.")
 
 # --- STEP 0: AUTOMATIC REFRESH (EVERY 30 SECONDS - QUIET BACKGROUND) ---
