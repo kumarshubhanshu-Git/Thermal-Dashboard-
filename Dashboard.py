@@ -21,9 +21,8 @@ def convert_to_csv_url(url):
 # --- STEP 2: PASTE YOUR GOOGLE SHEET LINK HERE ---
 SHEET_1_URL = "https://docs.google.com/spreadsheets/d/1m_8Uw2d37L7yYwKgrJ8lSQagkf6LEdmUWJdqOkAz0A4/edit?usp=sharing"
 
-# --- STEP 3: LOAD AND CLEAN LIVE DATA ---
-@st.cache_data(ttl=0)
-def load_live_data(url1):
+# --- STEP 3: LOAD AND INCREMENTALLY UPDATE LIVE DATA ---
+def fetch_raw_csv(url1):
     csv_url1 = convert_to_csv_url(url1)
     df1 = pd.read_csv(csv_url1)
     
@@ -40,8 +39,36 @@ def load_live_data(url1):
             
     return df1
 
+def get_incremental_data(url1):
+    # Initialize session state for persistent data storage
+    if "cached_df" not in st.session_state:
+        st.session_state["cached_df"] = pd.DataFrame()
+
+    # Fetch latest data state from Google Sheet
+    fresh_df = fetch_raw_csv(url1)
+
+    # Initial load: keep full dataframe as base
+    if st.session_state["cached_df"].empty:
+        st.session_state["cached_df"] = fresh_df
+    else:
+        existing_rows = len(st.session_state["cached_df"])
+        current_rows = len(fresh_df)
+
+        # Check if new rows have been appended to the sheet
+        if current_rows > existing_rows:
+            # Extract only the newly appended rows
+            new_rows = fresh_df.iloc[existing_rows:]
+            
+            # Append only new rows to the existing loaded DataFrame
+            st.session_state["cached_df"] = pd.concat(
+                [st.session_state["cached_df"], new_rows], 
+                ignore_index=True
+            )
+
+    return st.session_state["cached_df"]
+
 try:
-    combined_df = load_live_data(SHEET_1_URL)
+    combined_df = get_incremental_data(SHEET_1_URL)
     
     # Display preview expander
     with st.expander("👀 View Raw Data Preview"):
